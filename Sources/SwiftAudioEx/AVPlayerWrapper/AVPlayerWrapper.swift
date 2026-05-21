@@ -21,8 +21,12 @@ public enum PlaybackEndedReason: String {
 }
 
 class AVPlayerWrapper: AVPlayerWrapperProtocol {
+    /// Fires once per newly-constructed AVPlayerItem before it's handed to the AVPlayer.
+    /// Use to install audio mixes (e.g. MTAudioProcessingTap) without subclassing.
+    public static var onItemReady: ((AVPlayerItem) -> Void)?
+
     // MARK: - Properties
-    
+
     fileprivate var avPlayer = AVPlayer()
     private let playerObserver = AVPlayerObserver()
     internal let playerTimeObserver: AVPlayerTimeObserver
@@ -296,6 +300,7 @@ class AVPlayerWrapper: AVPlayerWrapperProtocol {
                         automaticallyLoadedAssetKeys: playableKeys
                     )
                     self.item = item;
+                    AVPlayerWrapper.onItemReady?(item)
                     item.preferredForwardBufferDuration = self.bufferDuration
                     self.avPlayer.replaceCurrentItem(with: item)
                     self.startObservingAVPlayer(item: item)
