@@ -23,7 +23,23 @@ public enum PlaybackEndedReason: String {
 class AVPlayerWrapper: AVPlayerWrapperProtocol {
     /// Fires once per newly-constructed AVPlayerItem before it's handed to the AVPlayer.
     /// Use to install audio mixes (e.g. MTAudioProcessingTap) without subclassing.
-    public static var onItemReady: ((AVPlayerItem) -> Void)?
+    /// Reads happen on the player's load queue (`DispatchQueue.global(qos: .userInitiated)`);
+    /// writes typically happen on the main thread at app startup. The lock makes
+    /// concurrent get/set safe even if the hook is reassigned at runtime.
+    private static let onItemReadyLock = NSLock()
+    private static var _onItemReady: ((AVPlayerItem) -> Void)?
+    public static var onItemReady: ((AVPlayerItem) -> Void)? {
+        get {
+            onItemReadyLock.lock()
+            defer { onItemReadyLock.unlock() }
+            return _onItemReady
+        }
+        set {
+            onItemReadyLock.lock()
+            defer { onItemReadyLock.unlock() }
+            _onItemReady = newValue
+        }
+    }
 
     // MARK: - Properties
 
