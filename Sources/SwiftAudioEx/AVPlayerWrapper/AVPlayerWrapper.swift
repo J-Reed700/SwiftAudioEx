@@ -20,12 +20,16 @@ public enum PlaybackEndedReason: String {
     case failed
 }
 
-class AVPlayerWrapper: AVPlayerWrapperProtocol {
-    /// Fires once per newly-constructed AVPlayerItem before it's handed to the AVPlayer.
-    /// Use to install audio mixes (e.g. MTAudioProcessingTap) without subclassing.
-    /// Reads happen on the player's load queue (`DispatchQueue.global(qos: .userInitiated)`);
-    /// writes typically happen on the main thread at app startup. The lock makes
-    /// concurrent get/set safe even if the hook is reassigned at runtime.
+/// Public hook namespace for external consumers to receive `AVPlayerItem`
+/// references as they're created by the player. Used to install audio
+/// mixes (e.g. MTAudioProcessingTap) without subclassing AVPlayerWrapper.
+///
+/// The wrapper class itself is internal-access by design, so the hook lives
+/// here as a public side-channel. Reads happen on the player's load queue
+/// (`DispatchQueue.global(qos: .userInitiated)`); writes typically happen
+/// on the main thread at app startup. The lock makes concurrent get/set
+/// safe even if the hook is reassigned at runtime.
+public enum SwiftAudioExHooks {
     private static let onItemReadyLock = NSLock()
     private static var _onItemReady: ((AVPlayerItem) -> Void)?
     public static var onItemReady: ((AVPlayerItem) -> Void)? {
@@ -40,7 +44,9 @@ class AVPlayerWrapper: AVPlayerWrapperProtocol {
             _onItemReady = newValue
         }
     }
+}
 
+class AVPlayerWrapper: AVPlayerWrapperProtocol {
     // MARK: - Properties
 
     fileprivate var avPlayer = AVPlayer()
@@ -316,7 +322,7 @@ class AVPlayerWrapper: AVPlayerWrapperProtocol {
                         automaticallyLoadedAssetKeys: playableKeys
                     )
                     self.item = item;
-                    AVPlayerWrapper.onItemReady?(item)
+                    SwiftAudioExHooks.onItemReady?(item)
                     item.preferredForwardBufferDuration = self.bufferDuration
                     self.avPlayer.replaceCurrentItem(with: item)
                     self.startObservingAVPlayer(item: item)
